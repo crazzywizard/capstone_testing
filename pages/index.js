@@ -1,8 +1,46 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
-
+import { ethers } from 'ethers';
+import { create as ipfsHttpClient } from 'ipfs-http-client';
+import Head from 'next/head';
+import Image from 'next/image';
+import styles from '../styles/Home.module.css';
+import Web3Modal from 'web3modal';
+import Alexa4Musicians_721 from '/home/sam/Desktop/projects/mvnu/capstone/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
+import { useEffect } from 'react';
+const client = ipfsHttpClient('https://ipfs.infura.io:5001/api/v0');
 export default function Home() {
+  const mint = async () => {
+    const web3Modal = new Web3Modal();
+    const connection = await web3Modal.connect();
+    const provider = new ethers.providers.Web3Provider(connection);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(
+      '0x1EedF9167c0a6f439b6696AbBf0d48434eCBb6F9',
+      Alexa4Musicians_721.abi,
+      signer
+    );
+    const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
+    // let setFee = await contract.setMintingFee(5);
+    // let t = await setFee.wait();
+    let fee = await contract.getMintingFee();
+    let balance = await contract.getBalance()
+    let owner = await contract.getOwnerAddress()
+    console.log(owner.toString());
+    const data = JSON.stringify({
+      name: 'sameer_alexa_skill',
+      description: 'alexa skill created by sameer',
+      image: url,
+      attributes: [{ trait_type: 'Skill_Id', value: 'ask1392084098234' }]
+    });
+    const added = await client.add(data);
+    const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
+    let trans = await contract.mint(ipfsURL, { value: fee.toString() });
+    let tx = await trans.wait();
+  };
+  useEffect(() => {
+    (async () => {
+      await mint();
+    })();
+  }, []);
   return (
     <div className={styles.container}>
       <Head>
@@ -15,41 +53,6 @@ export default function Home() {
         <h1 className={styles.title}>
           Welcome to <a href="https://nextjs.org">Next.js!</a>
         </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
       </main>
 
       <footer className={styles.footer}>
@@ -65,5 +68,5 @@ export default function Home() {
         </a>
       </footer>
     </div>
-  )
+  );
 }
