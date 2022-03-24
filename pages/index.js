@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import styles from '../styles/Home.module.css';
 import Web3Modal from 'web3modal';
-import Alexa4Musicians_721 from '/home/sam/Desktop/mvnu/erc721_upgradable_smart_contract/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
+import Alexa4Musicians_721 from '/home/mvnu/Desktop/projects/erc721_upgradable_smart_contract/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
 import { useEffect } from 'react';
 import React from 'react';
 import Button from '@material-tailwind/react/Button';
@@ -28,7 +28,8 @@ export default function Home() {
     const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
     // let setFee = await contract.setMintingFee(5);
     //  let t = await setFee.wait();
-    let fee = await contract.getMintingFee();
+    let fee = await contract.getMaticFee(true);
+    console.log(fee.toString());
     const data = JSON.stringify({
       name: 'sameer_alexa_skill',
       description: 'alexa skill created by sameer',
@@ -37,7 +38,7 @@ export default function Home() {
     });
     const added = await client.add(data);
     const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
-    let trans = await contract.mint(ipfsURL, { value: fee.toString() });
+    let trans = await contract.mint(ipfsURL, true, { value: fee.toString() });
     let tx = await trans.wait();
   };
   return (
