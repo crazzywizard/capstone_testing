@@ -4,12 +4,56 @@ import Head from 'next/head';
 import Image from 'next/image';
 import styles from '../styles/Home.module.css';
 import Web3Modal from 'web3modal';
-import Alexa4Musicians_721 from '/home/mvnu/Desktop/projects/erc721_upgradable_smart_contract/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
-import { useEffect } from 'react';
+import Alexa4Musicians_721 from '/home/mvnu/projects/erc721_upgradable_smart_contract/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
+import { useEffect, useState } from 'react';
 import React from 'react';
 import Button from '@material-tailwind/react/Button';
 const client = ipfsHttpClient('https://ipfs.infura.io:5001/api/v0');
 export default function Home() {
+  const [provider, setProvider] = useState();
+  const [web3Modal, setWeb3Modal] = useState();
+  const [library, setLibrary] = useState();
+  const [account, setAccount] = useState();
+  const [error, setError] = useState('');
+  const [chainId, setChainId] = useState();
+  const [network, setNetwork] = useState();
+  const connectWallet = async () => {
+    try {
+      const web3Modal = new Web3Modal();
+      setWeb3Modal(web3Modal);
+      const provider = await web3Modal.connect();
+      const library = new ethers.providers.Web3Provider(provider);
+      const accounts = await library.listAccounts();
+      const network = await library.getNetwork();
+      setProvider(provider);
+      setLibrary(library);
+      setAccount(accounts[0]);
+      if (accounts) {
+        setChainId(network.chainId);
+      }
+    } catch (error) {
+      setError(error);
+    }
+  };
+
+  const handleNetwork = (e) => {
+    const id = e.target.value;
+    setNetwork(Number(id));
+  };
+  const refreshState = () => {
+    setAccount();
+    setChainId();
+    setNetwork('');
+  };
+  useEffect(() => {
+    if (web3Modal) {
+      connectWallet();
+    }
+  }, []);
+  const disconnect = async () => {
+    await web3Modal.clearCachedProvider();
+    refreshState();
+  };
   const contract_init = async () => {
     const web3Modal = new Web3Modal();
     const connection = await web3Modal.connect();
@@ -24,22 +68,32 @@ export default function Home() {
   };
   const mint = async (e) => {
     e.preventDefault();
-    const contract = await contract_init();
-    const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
-    // let setFee = await contract.setMintingFee(5);
-    //  let t = await setFee.wait();
-    let fee = await contract.getMaticFee(true);
-    console.log(fee.toString());
-    const data = JSON.stringify({
-      name: 'sameer_alexa_skill',
-      description: 'alexa skill created by sameer',
-      image: url,
-      attributes: [{ trait_type: 'Skill_Id', value: 'ask1392084098234' }]
-    });
-    const added = await client.add(data);
-    const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
-    let trans = await contract.mint(ipfsURL, true, { value: fee.toString() });
-    let tx = await trans.wait();
+    try {
+      const contract = await contract_init();
+      const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
+      // let setFee = await contract.setMintingFee(5);
+      //  let t = await setFee.wait();
+      let fee = await contract.getMaticFee(true);
+      console.log(fee.toString());
+      const data = JSON.stringify({
+        name: 'sameer_alexa_skill',
+        description: 'alexa skill created by sameer',
+        image: url,
+        attributes: [{ trait_type: 'Skill_Id', value: 'ask1392084098235' }]
+      });
+      const added = await client.add(data);
+      const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
+      let trans = await contract.mint(ipfsURL, 'ask1392084098235', true, {
+        gasPrice: ethers.utils.parseUnits('30', 'gwei'),
+        gasLimit: 1000000,
+        value: fee.toString()
+      });
+
+      let tx = await trans.wait();
+    } catch (err) {
+      console.error(err);
+      alert(err.data.message);
+    }
   };
   return (
     <div className={styles.container}>
@@ -62,9 +116,15 @@ export default function Home() {
         <h1 className={styles.title}>
           Welcome to <a href="https://nextjs.org">Next.js!</a>
         </h1>
-        <Button color="lightBlue" ripple="light" onClick={mint}>
-          Mint
-        </Button>
+        {!account ? (
+          <Button color="blueGray" ripple="light" onClick={connectWallet}>
+            Connect Wallet
+          </Button>
+        ) : (
+          <Button color="lightBlue" ripple="light" onClick={mint}>
+            Mint
+          </Button>
+        )}
       </main>
 
       <footer className={styles.footer}>
