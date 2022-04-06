@@ -8,8 +8,10 @@ import Alexa4Musicians_721 from '/home/mvnu/projects/erc721_upgradable_smart_con
 import { useEffect, useState } from 'react';
 import React from 'react';
 import Button from '@material-tailwind/react/Button';
+import { OnboardingButton } from '../src/Onboarding';
 const client = ipfsHttpClient('https://ipfs.infura.io:5001/api/v0');
 export default function Home() {
+  const [onBoard, setOnBoard] = useState(false);
   const [provider, setProvider] = useState();
   const [web3Modal, setWeb3Modal] = useState();
   const [library, setLibrary] = useState();
@@ -20,15 +22,15 @@ export default function Home() {
   const connectWallet = async () => {
     try {
       const web3Modal = new Web3Modal();
-      setWeb3Modal(web3Modal);
       const provider = await web3Modal.connect();
       const library = new ethers.providers.Web3Provider(provider);
       const accounts = await library.listAccounts();
       const network = await library.getNetwork();
       setProvider(provider);
       setLibrary(library);
-      setAccount(accounts[0]);
+
       if (accounts) {
+        setAccount(accounts[0]);
         setChainId(network.chainId);
       }
     } catch (error) {
@@ -36,6 +38,17 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    async function listenMMAccount() {
+      window.ethereum.on('accountsChanged', async function () {
+        // Time to reload your interface with accounts[0]!
+        await connectWallet();
+      });
+    }
+    if (typeof window.ethereum !== 'undefined' || typeof window.web3 !== 'undefined') {
+      listenMMAccount();
+    }
+  }, []);
   const handleNetwork = (e) => {
     const id = e.target.value;
     setNetwork(Number(id));
@@ -46,19 +59,37 @@ export default function Home() {
     setNetwork('');
   };
   useEffect(() => {
-    if (web3Modal) {
-      connectWallet();
+    if (typeof window.ethereum !== 'undefined' || typeof window.web3 !== 'undefined') {
+      // Web3 browser user detected. You can now use the provider.
+      const provider = window['ethereum'] || window.web3.currentProvider;
+      console.log(provider);
+      window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [
+          {
+            chainId: '0x13881',
+            rpcUrls: ['https://polygon-mumbai.g.alchemy.com/v2/ILaQRSx7P94pGGYyJmF_3iqxdnQgxxI-'],
+            chainName: 'Mumbai',
+            nativeCurrency: {
+              name: 'MATIC',
+              symbol: 'MATIC',
+              decimals: 18
+            },
+            blockExplorerUrls: ['https://polygonscan.com/']
+          }
+        ]
+      });
+    } else {
+      setOnBoard(true);
+      console.log('No metamask installed');
     }
-  }, []);
+  }, [onBoard]);
   const disconnect = async () => {
     await web3Modal.clearCachedProvider();
     refreshState();
   };
   const contract_init = async () => {
-    const web3Modal = new Web3Modal();
-    const connection = await web3Modal.connect();
-    const provider = new ethers.providers.Web3Provider(connection);
-    const signer = provider.getSigner();
+    const signer = library.getSigner();
     const contract = new ethers.Contract(
       '0x812770C422D66476659cd2D0F2E0BC46ee68c0cc',
       Alexa4Musicians_721.abi,
@@ -66,33 +97,50 @@ export default function Home() {
     );
     return contract;
   };
+  const isSkillMinted = async (skillId) => {
+    try {
+      const contract = await contract_init();
+      return contract.isSkillMinted(skillId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const getMintedData = async (skillId) => {
+    try {
+      const contract = await contract_init();
+      return contract.getArtistsData(skillId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
   const mint = async (e) => {
     e.preventDefault();
     try {
-      const contract = await contract_init();
-      const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
-      // let setFee = await contract.setMintingFee(5);
-      //  let t = await setFee.wait();
-      let fee = await contract.getMaticFee(true);
-      console.log(fee.toString());
-      const data = JSON.stringify({
-        name: 'sameer_alexa_skill',
-        description: 'alexa skill created by sameer',
-        image: url,
-        attributes: [{ trait_type: 'Skill_Id', value: 'ask1392084098235' }]
-      });
-      const added = await client.add(data);
-      const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
-      let trans = await contract.mint(ipfsURL, 'ask1392084098235', true, {
-        gasPrice: ethers.utils.parseUnits('30', 'gwei'),
-        gasLimit: 1000000,
-        value: fee.toString()
-      });
+      const skillId = 'ask1392084098237';
+      if (await isSkillMinted(skillId)) {
+        console.log(await getMintedData(skillId));
+      } else {
+        const contract = await contract_init();
+        const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
+        let fee = await contract.getMaticFee(true);
+        const data = JSON.stringify({
+          name: 'sameer_alexa_skill',
+          description: 'alexa skill created by sameer',
+          image: url,
+          attributes: [{ trait_type: 'Skill_Id', value: skillId }]
+        });
+        const added = await client.add(data);
+        const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
+        let trans = await contract.mint(ipfsURL, skillId, true, {
+          // gasPrice: ethers.utils.parseUnits('30', 'gwei'),
+          // gasLimit: 1000000,
+          value: fee.toString()
+        });
 
-      let tx = await trans.wait();
+        let tx = await trans.wait();
+      }
     } catch (err) {
       console.error(err);
-      alert(err.data.message);
     }
   };
   return (
@@ -116,7 +164,9 @@ export default function Home() {
         <h1 className={styles.title}>
           Welcome to <a href="https://nextjs.org">Next.js!</a>
         </h1>
-        {!account ? (
+        {onBoard ? (
+          <OnboardingButton setOnBoard={setOnBoard} />
+        ) : !account ? (
           <Button color="blueGray" ripple="light" onClick={connectWallet}>
             Connect Wallet
           </Button>
