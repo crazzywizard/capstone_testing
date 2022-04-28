@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Image from 'next/image';
 import styles from '../styles/Home.module.css';
 import Web3Modal from 'web3modal';
-import Alexa4Musicians_721 from '/home/mvnu/projects/erc721_upgradable_smart_contract/artifacts/contracts/Alexa4Musicians_721.sol/Alexa4Musicians_721.json';
+import Alexa4Musicians_721 from '../src/contract/Alexa4Musicians_721.json';
 import { useEffect, useState } from 'react';
 import React from 'react';
 import Button from '@material-tailwind/react/Button';
@@ -19,10 +19,11 @@ export default function Home() {
   const [error, setError] = useState('');
   const [chainId, setChainId] = useState();
   const [network, setNetwork] = useState();
+  const [contract, setContract] = useState(null);
   const connectWallet = async () => {
     try {
       const web3Modal = new Web3Modal();
-      const provider = await web3Modal.connect();
+      const provider = provider ? provider : await web3Modal.connect();
       const library = new ethers.providers.Web3Provider(provider);
       const accounts = await library.listAccounts();
       const network = await library.getNetwork();
@@ -59,30 +60,48 @@ export default function Home() {
     setNetwork('');
   };
   useEffect(() => {
-    if (typeof window.ethereum !== 'undefined' || typeof window.web3 !== 'undefined') {
-      // Web3 browser user detected. You can now use the provider.
-      const provider = window['ethereum'] || window.web3.currentProvider;
-      console.log(provider);
-      window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: '0x13881',
-            rpcUrls: ['https://polygon-mumbai.g.alchemy.com/v2/ILaQRSx7P94pGGYyJmF_3iqxdnQgxxI-'],
-            chainName: 'Mumbai',
-            nativeCurrency: {
-              name: 'MATIC',
-              symbol: 'MATIC',
-              decimals: 18
-            },
-            blockExplorerUrls: ['https://polygonscan.com/']
-          }
-        ]
-      });
-    } else {
-      setOnBoard(true);
-      console.log('No metamask installed');
-    }
+    (async () => {
+      if (typeof window.ethereum !== 'undefined' || typeof window.web3 !== 'undefined') {
+        // Web3 browser user detected. You can now use the provider.
+        const provider = window['ethereum'] || window.web3.currentProvider;
+        setProvider(provider);
+        const library = new ethers.providers.Web3Provider(provider);
+        setLibrary(library);
+        const accounts = await library.listAccounts();
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+          const signer = library.getSigner();
+          const contract = new ethers.Contract(
+            '0x812770C422D66476659cd2D0F2E0BC46ee68c0cc',
+            Alexa4Musicians_721.abi,
+            signer
+          );
+          setContract(contract);
+        } else {
+          window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0x13881',
+                rpcUrls: [
+                  'https://polygon-mumbai.g.alchemy.com/v2/ILaQRSx7P94pGGYyJmF_3iqxdnQgxxI-'
+                ],
+                chainName: 'Mumbai',
+                nativeCurrency: {
+                  name: 'MATIC',
+                  symbol: 'MATIC',
+                  decimals: 18
+                },
+                blockExplorerUrls: ['https://polygonscan.com/']
+              }
+            ]
+          });
+        }
+      } else {
+        setOnBoard(true);
+        console.log('No metamask installed');
+      }
+    })();
   }, [onBoard]);
   const disconnect = async () => {
     await web3Modal.clearCachedProvider();
@@ -99,7 +118,7 @@ export default function Home() {
   };
   const isSkillMinted = async (skillId) => {
     try {
-      const contract = await contract_init();
+      const contract = contract ? contract : await contract_init();
       return contract.isSkillMinted(skillId);
     } catch (e) {
       console.error(e);
@@ -107,7 +126,7 @@ export default function Home() {
   };
   const getMintedData = async (skillId) => {
     try {
-      const contract = await contract_init();
+      const contract = contract ? contract : await contract_init();
       return contract.getArtistsData(skillId);
     } catch (e) {
       console.error(e);
@@ -116,12 +135,12 @@ export default function Home() {
   const mint = async (e) => {
     e.preventDefault();
     try {
-      const skillId = 'ask1392084098237';
+      const skillId = 'amzn1.ask.skill.7ecc72bb-d801-406f-bfb1-deac1c2f2fbc';
       if (await isSkillMinted(skillId)) {
         console.log(await getMintedData(skillId));
       } else {
         const contract = await contract_init();
-        const url = `https://gateway.pinata.cloud/ipfs/QmchHMxjZETrzTXFwVVPh2tE9n1y2wRfLdjLCNeJj33jnb`;
+        const url = `https://gateway.pinata.cloud/ipfs/QmRkY9ea98cFAesrV5eYScqMfaMYB2nsYMUzcUdRJhYnvn`;
         let fee = await contract.getMaticFee(true);
         const data = JSON.stringify({
           name: 'sameer_alexa_skill',
