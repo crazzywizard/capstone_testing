@@ -24,6 +24,7 @@ export default function Home() {
     try {
       const web3Modal = new Web3Modal();
       const provider = provider ? provider : await web3Modal.connect();
+      console.log(provider);
       const library = new ethers.providers.Web3Provider(provider);
       const accounts = await library.listAccounts();
       const network = await library.getNetwork();
@@ -38,7 +39,6 @@ export default function Home() {
       setError(error);
     }
   };
-
   useEffect(() => {
     async function listenMMAccount() {
       window.ethereum.on('accountsChanged', async function () {
@@ -135,7 +135,7 @@ export default function Home() {
   const mint = async (e) => {
     e.preventDefault();
     try {
-      const skillId = 'amzn1.ask.skill.7ecc72bb-d801-406f-bfb1-deac1c2f2fbc';
+      const skillId = 'amzn1.ask.skill.7fcc72bb-d801-406f-bfb1-deac1c2f2fbc';
       if (await isSkillMinted(skillId)) {
         console.log(await getMintedData(skillId));
       } else {
@@ -150,16 +150,18 @@ export default function Home() {
         });
         const added = await client.add(data);
         const ipfsURL = `https://ipfs.infura.io/ipfs/${added.path}`;
-        let trans = await contract.mint(ipfsURL, skillId, true, {
-          // gasPrice: ethers.utils.parseUnits('30', 'gwei'),
-          // gasLimit: 1000000,
-          value: fee.toString()
-        });
+        try {
+          let trans = await contract.mint(ipfsURL, skillId, true, {
+            value: fee.toString()
+          });
 
-        let tx = await trans.wait();
+          let tx = await trans.wait();
+        } catch (e) {
+          console.log('error', e.data.message);
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error', err);
     }
   };
   return (
